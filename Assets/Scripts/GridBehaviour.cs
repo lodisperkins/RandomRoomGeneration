@@ -4,19 +4,10 @@ using UnityEngine;
 using UnityEditor;
 using System;
 using Unity.Collections;
+using Random = UnityEngine.Random;
 
 namespace Lodis.GridScripts
 {
-    /// <summary>
-    /// Used to label which side of the grid an object belongs to
-    /// </summary>
-    public enum RoomType
-    {
-        EMPTY,
-        ENEMY,
-        TREASURE,
-        START
-    }
 
     public class GridBehaviour : MonoBehaviour
     {
@@ -36,18 +27,14 @@ namespace Lodis.GridScripts
         [SerializeField]
         private Vector2 _spawnRoomPosition;
         [SerializeField]
-        [Range(0, 100)]
-        private float _emptyRoomLikelihood;
+        private RoomSpawnData _startRoomData;
         [SerializeField]
-        [Range(0, 100)]
-        private float _enemyRoomLikelihood;
+        private RoomSpawnData _exitRoomData;
         [SerializeField]
-        [Range(0, 100)]
-        private float _treasureRoomLikelihood;
+        private RoomSpawnData _inkRoomData;
+        [SerializeField]
+        private RoomSpawnData[] _roomSpawnData;
         private RoomBehaviour _spawnRoom;
-        [ReadOnlyAttribute]
-        [SerializeField]
-        private int test = 2;
 
         /// <summary>
         /// The spawn point for the character on the left side of the grid
@@ -128,10 +115,13 @@ namespace Lodis.GridScripts
         /// </summary>
         public void CreateGrid()
         {
+            ResetRoomSpawnCount();
             _panels = new RoomBehaviour[(int)_dimensions.x, (int)_dimensions.y];
 
             //The world spawn position for each gameobject in the grid
             Vector3 spawnPosition = transform.position;
+            int spawnRoom = (int)Random.Range(0, _dimensions.x);
+            int exitRoom = (int)Random.Range(_dimensions.x * (_dimensions.y - 1), (_dimensions.x * _dimensions.y));
 
             //The x and y position for each game object in the grid
             int xPos = 0;
@@ -144,10 +134,12 @@ namespace Lodis.GridScripts
                 RoomBehaviour roomBehaviour = _panels[xPos, yPos];
                 roomBehaviour.Position = new Vector2(xPos, yPos);
 
-                if (roomBehaviour.Position != _spawnRoomPosition)
-                    roomBehaviour.Type = GetRandomRoomType();
-                else
-                    roomBehaviour.Type = RoomType.START;
+                //Try spawn start room
+                if (spawnRoom == i) roomBehaviour.SpawnData = _startRoomData;
+                else if (exitRoom == i) roomBehaviour.SpawnData = _exitRoomData;
+                else roomBehaviour.SpawnData = GetRandomRoomType(i);
+
+                roomBehaviour.SpawnData.IncreaseSpawnCount();
 
                 //If the x position in the grid is equal to the given x dimension,
                 //reset x position to be 0, and increase the y position.
@@ -171,22 +163,19 @@ namespace Lodis.GridScripts
             _height = (_dimensions.y * _panelRef.transform.localScale.z) + (PanelSpacingZ * _dimensions.y);
         }
 
-        private RoomType GetRandomRoomType()
+        private RoomSpawnData GetRandomRoomType(int currentRoomIndex)
         {
-            float max = _emptyRoomLikelihood + _enemyRoomLikelihood + _treasureRoomLikelihood;
+            float max = _dimensions.x * _dimensions.y;
+            float min = 0;
 
-            float[] probabilityValues = { _emptyRoomLikelihood, _enemyRoomLikelihood, _treasureRoomLikelihood };
-
-            Array.Sort(probabilityValues);
-
-            float previous = 0;
-
-            for (int i = 0;  i < probabilityValues.Length; i++)
+            for (int i = 0; i < _roomSpawnData.Length; i++)
             {
-                float value = UnityEngine.Random.Range(1, max);
+                float rand = Random.Range(min, max);
+                if (rand <= currentRoomIndex + _roomSpawnData[i].MinSpawnAmount && _roomSpawnData[i].GetCanSpawn() )
+                    return _roomSpawnData[i];
             }
 
-            return RoomType.EMPTY;
+            return _inkRoomData;
         }
 
         /// <summary>
@@ -241,7 +230,7 @@ namespace Lodis.GridScripts
         /// <param name="isLocked">If true, the function will return true even if the panel found is occupied.</param>
         /// <param name="roomType">Will return false if the panel found doesn't match this roomType.</param>
         /// <returns>Returns true if the panel is found in the list and the IsLocked condition is met.</returns>
-        public bool GetPanel(int x, int y, out RoomBehaviour room, bool isLocked = true, RoomType roomType = RoomType.EMPTY)
+        public bool GetPanel(int x, int y, out RoomBehaviour room, bool isLocked = true, string roomType = "")
         {
             room = null;
 
@@ -250,7 +239,7 @@ namespace Lodis.GridScripts
                 return false;
             else if (!isLocked && _panels[x, y].IsLocked)
                 return false;
-            else if (_panels[x, y].Type != roomType && roomType != RoomType.EMPTY)
+            else if (_panels[x, y].SpawnData.Name != roomType && roomType != "")
                 return false;
 
             room = _panels[x, y];
@@ -267,7 +256,7 @@ namespace Lodis.GridScripts
         /// <param name="isLocked">If true, the function will return true even if the panel found is occupied.</param>
         /// <param name="roomType">Will return false if the panel found doesn't match this roomType.</param>
         /// <returns>Returns true if the panel is found in the list and the IsLocked condition is met.</returns>
-        public bool GetPanel(Vector2 position, out RoomBehaviour panel, bool isLocked = true, RoomType roomType = RoomType.EMPTY)
+        public bool GetPanel(Vector2 position, out RoomBehaviour panel, bool isLocked = true, string roomType = "")
         { 
             panel = null;
 
@@ -279,7 +268,7 @@ namespace Lodis.GridScripts
                 return false;
             else if (!isLocked && _panels[(int)position.x, (int)position.y].IsLocked)
                 return false;
-            else if (_panels[(int)position.x, (int)position.y].Type != roomType && roomType != RoomType.EMPTY)
+            else if (_panels[(int)position.x, (int)position.y].SpawnData.Name != roomType && roomType != "")
                 return false;
 
             panel = _panels[Mathf.RoundToInt(position.x), Mathf.RoundToInt(position.y)];
@@ -295,7 +284,7 @@ namespace Lodis.GridScripts
         /// <param name="IsLocked">Whether or not panels that are occupied should be ignored</param>
         /// <param name="roomType">The side of the grid to look for this panel</param>
         /// <returns></returns>
-        public bool GetPanelAtLocationInWorld(Vector3 location, out RoomBehaviour panel, bool IsLocked = true, RoomType roomType = RoomType.EMPTY)
+        public bool GetPanelAtLocationInWorld(Vector3 location, out RoomBehaviour panel, bool IsLocked = true, string roomType = "")
         {
             panel = null;
 
@@ -310,7 +299,7 @@ namespace Lodis.GridScripts
                 return false;
             else if (!IsLocked && _panels[x, y].IsLocked)
                 return false;
-            else if (_panels[x, y].Type != roomType && roomType != RoomType.EMPTY)
+            else if (_panels[x, y].SpawnData.Name != roomType && roomType != "")
                 return false;
 
             panel = _panels[x, y];
@@ -325,7 +314,7 @@ namespace Lodis.GridScripts
         /// <param name="IsLocked">Whether or not to ignore panels that are ooccupied</param>
         /// <param name="roomType">The side of the grid to look for neighbors. Panels found on the other side will be ignored</param>
         /// <returns></returns>
-        public List<RoomBehaviour> GetPanelNeighbors(Vector2 position, bool IsLocked = true, RoomType roomType = RoomType.EMPTY)
+        public List<RoomBehaviour> GetPanelNeighbors(Vector2 position, bool IsLocked = true, string roomType = "")
         {
             List<RoomBehaviour> neighbors = new List<RoomBehaviour>();
 
@@ -345,6 +334,20 @@ namespace Lodis.GridScripts
             }
 
             return neighbors;
+        }
+
+        private void ResetRoomSpawnCount()
+        {
+            _startRoomData.ResetSpawnCount();
+            _exitRoomData.ResetSpawnCount();
+            _inkRoomData.ResetSpawnCount();
+            for (int i = 0; i < _roomSpawnData.Length; i++)
+                _roomSpawnData[i].ResetSpawnCount();
+        }
+
+        private void OnDestroy()
+        {
+            ResetRoomSpawnCount();
         }
     }
 
