@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b1341af855b5c38498b3a40be27fb661, type: 3}
   m_Name: TreasureRoomSpawnData
   m_EditorClassIdentifier: 
-  _name: Treasure
-  _minSpawnAmount: 1
+  _name: TreasureRoom
+  _minSpawnAmount: 0
   _maxSpawnAmount: 1
   _spawnCount: 0
-  _debugColor: {r: 0.8018868, g: 0.7451665, b: 0, a: 0}
+  _debugColor: {r: 0.8207547, g: 0.7890929, b: 0, a: 0}

@@ -35,6 +35,8 @@ namespace Lodis.GridScripts
         [SerializeField]
         private RoomSpawnData[] _roomSpawnData;
         private RoomBehaviour _spawnRoom;
+        [SerializeField]
+        private RoomConnectionBehaviour _connectionRef;
 
         /// <summary>
         /// The spawn point for the character on the left side of the grid
@@ -121,40 +123,59 @@ namespace Lodis.GridScripts
             //The world spawn position for each gameobject in the grid
             Vector3 spawnPosition = transform.position;
             int spawnRoom = (int)Random.Range(0, _dimensions.x);
-            int exitRoom = (int)Random.Range(_dimensions.x * (_dimensions.y - 1), (_dimensions.x * _dimensions.y));
+            int exitRoom = (int)Random.Range(0, _dimensions.x);
 
             //The x and y position for each game object in the grid
-            int xPos = 0;
-            int yPos = 0;
-            for (int i = 0; i < (int)_dimensions.x * (int)_dimensions.y; i++)
+            for (int i = 0; i < (int)_dimensions.y; i++)
             {
-                GameObject room = Instantiate(_panelRef, spawnPosition, new Quaternion(), transform);
-                room.transform.localScale = _roomScale;
-                _panels[xPos, yPos] = room.GetComponent<RoomBehaviour>();
-                RoomBehaviour roomBehaviour = _panels[xPos, yPos];
-                roomBehaviour.Position = new Vector2(xPos, yPos);
+                for (int j = 0; j < (int)_dimensions.x; j++)
+                {
+                    _panels[j, i] = Instantiate(_panelRef, spawnPosition, new Quaternion(), transform).GetComponent<RoomBehaviour>();
+                    RoomBehaviour room = _panels[j, i];
+                    room.Position = new Vector2(j, i);
+                    room.transform.localScale = _roomScale;
 
-                //Try spawn start room
-                if (spawnRoom == i) roomBehaviour.SpawnData = _startRoomData;
-                else if (exitRoom == i) roomBehaviour.SpawnData = _exitRoomData;
-                else roomBehaviour.SpawnData = GetRandomRoomType(i);
+                    //Try spawn start room
+                    if (spawnRoom == j && i == 0)
+                        room.SpawnData = _startRoomData;
+                    else if (exitRoom == j && i == _dimensions.y - 1)
+                        room.SpawnData = _exitRoomData;
+                    else room.SpawnData = GetRandomRoomType(i);
 
-                roomBehaviour.SpawnData.IncreaseSpawnCount();
+                    room.SpawnData.IncreaseSpawnCount();
+
+                    if (j > 0)
+                    {
+                        RoomConnectionBehaviour roomConnection = Instantiate(_connectionRef, null);
+                        roomConnection.ConnectionData = new RoomConnectionData { ConnectionType = (ConnectionType)Random.Range(1, 3) };
+
+                        RoomBehaviour previousRoom = _panels[j - 1, i];
+                        previousRoom.SetRoomConnection(roomConnection, RoomConnectionDirection.EAST);
+                        room.SetRoomConnection(roomConnection, RoomConnectionDirection.WEST);
+                    }
+                    else if (i > 0)
+                    {
+                        RoomConnectionBehaviour roomConnection = Instantiate(_connectionRef, null);
+                        roomConnection.ConnectionData = new RoomConnectionData { ConnectionType = (ConnectionType)Random.Range(1, 3) };
+
+                        RoomBehaviour roomBelow = _panels[j, i - 1];
+                        roomBelow.SetRoomConnection(roomConnection, RoomConnectionDirection.NORTH);
+                        room.SetRoomConnection(roomConnection, RoomConnectionDirection.SOUTH);
+                    }
+
+                    //Increase x position
+                    spawnPosition.x += PanelSpacingX;
+                }
 
                 //If the x position in the grid is equal to the given x dimension,
                 //reset x position to be 0, and increase the y position.
-                if (xPos == (int)_dimensions.x - 1)
-                {
-                    xPos = 0;
-                    spawnPosition.x = transform.position.x;
-                    yPos++;
-                    spawnPosition.z += PanelSpacingZ;
-                    continue;
-                }
+                spawnPosition.x = transform.position.x;
+                spawnPosition.z += PanelSpacingZ;
+            }
 
-                //Increase x position
-                xPos++;
-                spawnPosition.x += PanelSpacingX;
+            foreach (RoomBehaviour room in _panels)
+            {
+                room.FillEmptyConnections(_connectionRef);
             }
 
             if (!GetPanel(_spawnRoomPosition, out _spawnRoom)) Debug.LogError("Spawn point is invalid");

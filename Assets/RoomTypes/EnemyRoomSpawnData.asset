@@ -16,4 +16,4 @@ MonoBehaviour:
   _minSpawnAmount: 2
   _maxSpawnAmount: 4
   _spawnCount: 0
-  _debugColor: {r: 0.735849, g: 0, b: 0, a: 0}
+  _debugColor: {r: 0.7735849, g: 0, b: 0, a: 0}
