@@ -61,12 +61,20 @@ public class RoomBehaviour : MonoBehaviour
         roomConnection.transform.rotation = _connectionSpawns[(int)direction].rotation;
     }
 
+    public void DestroyConnections()
+    {
+        for (int i = 0; i < _roomConnections.Length; i++)
+            Destroy(_roomConnections[i].gameObject);
+    }
+
     public void FillEmptyConnections(RoomConnectionBehaviour connectionRef)
     {
         for (int i = 0; i < _roomConnections.Length; i++)
         {
             if (_roomConnections[i] == null)
-             _roomConnections[i] = Instantiate(connectionRef, _connectionSpawns[i]);
+            {
+                _roomConnections[i] = Instantiate(connectionRef, _connectionSpawns[i]);
+            }
         }
     }
 }

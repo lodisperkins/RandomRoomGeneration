@@ -49,10 +49,10 @@ public class RoomConnectionBehaviour : MonoBehaviour
                 Instantiate(_wallFill, transform);
                 break;
             case ConnectionType.LOCKED:
-                Instantiate(_unlockedDoor, transform);
+                Instantiate(_lockedDoor, transform);
                 break;
             case ConnectionType.OPEN:
-                Instantiate(_lockedDoor, transform);
+                Instantiate(_unlockedDoor, transform);
                 break;
         }
     }

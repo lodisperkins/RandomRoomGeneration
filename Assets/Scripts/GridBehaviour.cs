@@ -34,6 +34,9 @@ namespace Lodis.GridScripts
         private RoomSpawnData _inkRoomData;
         [SerializeField]
         private RoomSpawnData[] _roomSpawnData;
+        [SerializeField]
+        private List<RoomConnectionData> _roomConnectionData;
+        private Dictionary<(Vector2, Vector2), RoomConnectionData> _roomDataDictionary;
         private RoomBehaviour _spawnRoom;
         [SerializeField]
         private RoomConnectionBehaviour _connectionRef;
@@ -111,12 +114,27 @@ namespace Lodis.GridScripts
         /// The height of the grid in relation to the world space
         /// </summary>
         public float Height { get => _height; }
+        public List<RoomConnectionData> RoomConnectionData { get => _roomConnectionData; set => _roomConnectionData = value; }
+
+        public void GenerateConnectionDictionary()
+        {
+            _roomDataDictionary = new Dictionary<(Vector2, Vector2), RoomConnectionData>();
+            foreach (RoomConnectionData data in _roomConnectionData)
+            {
+                (Vector2, Vector2) connectionPositions1 = (data.Room1Position, data.Room2Position);
+                (Vector2, Vector2) connectionPositions2 = (data.Room2Position, data.Room1Position);
+                _roomDataDictionary.Add(connectionPositions1, data);
+                _roomDataDictionary.Add(connectionPositions2, data);
+            }
+        }
 
         /// <summary>
         /// Creates a grid using the given dimensions and spacing.
         /// </summary>
         public void CreateGrid()
         {
+            
+            GenerateConnectionDictionary();
             ResetRoomSpawnCount();
             _panels = new RoomBehaviour[(int)_dimensions.x, (int)_dimensions.y];
 
@@ -146,21 +164,32 @@ namespace Lodis.GridScripts
 
                     if (j > 0)
                     {
-                        RoomConnectionBehaviour roomConnection = Instantiate(_connectionRef, null);
-                        roomConnection.ConnectionData = new RoomConnectionData { ConnectionType = (ConnectionType)Random.Range(1, 3) };
-
+                        RoomConnectionData data;
                         RoomBehaviour previousRoom = _panels[j - 1, i];
-                        previousRoom.SetRoomConnection(roomConnection, RoomConnectionDirection.EAST);
-                        room.SetRoomConnection(roomConnection, RoomConnectionDirection.WEST);
-                    }
-                    else if (i > 0)
-                    {
-                        RoomConnectionBehaviour roomConnection = Instantiate(_connectionRef, null);
-                        roomConnection.ConnectionData = new RoomConnectionData { ConnectionType = (ConnectionType)Random.Range(1, 3) };
 
+                        if (_roomDataDictionary.TryGetValue((previousRoom.Position, room.Position), out data))
+                        {
+                            RoomConnectionBehaviour roomConnection = Instantiate(_connectionRef, null);
+                            roomConnection.ConnectionData = data;
+
+                            previousRoom.SetRoomConnection(roomConnection, RoomConnectionDirection.EAST);
+                            room.SetRoomConnection(roomConnection, RoomConnectionDirection.WEST);
+                        }
+                    }
+                    
+                    if (i > 0)
+                    {
+                        RoomConnectionData data;
                         RoomBehaviour roomBelow = _panels[j, i - 1];
-                        roomBelow.SetRoomConnection(roomConnection, RoomConnectionDirection.NORTH);
-                        room.SetRoomConnection(roomConnection, RoomConnectionDirection.SOUTH);
+
+                        if (_roomDataDictionary.TryGetValue((roomBelow.Position, room.Position), out data))
+                        {
+                            RoomConnectionBehaviour roomConnection = Instantiate(_connectionRef, null);
+                            roomConnection.ConnectionData = data;
+
+                            roomBelow.SetRoomConnection(roomConnection, RoomConnectionDirection.NORTH);
+                            room.SetRoomConnection(roomConnection, RoomConnectionDirection.SOUTH);
+                        }
                     }
 
                     //Increase x position
@@ -236,6 +265,7 @@ namespace Lodis.GridScripts
             {
                 for (int j = 0; j < _dimensions.y; j++)
                 {
+                    _panels[i, j].DestroyConnections();
                     Destroy(_panels[i, j].gameObject);
                 }
             }
@@ -384,7 +414,7 @@ namespace Lodis.GridScripts
 
             if (GUILayout.Button("View Grid"))
             {
-                _grid.DestroyTempPanelsInEditor();
+                _grid.DestroyGrid();
                 _grid.CreateGrid();
             }
         }
